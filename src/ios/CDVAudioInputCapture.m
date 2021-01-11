@@ -13,6 +13,7 @@
 - (void)start:(CDVInvokedUrlCommand*)command;
 - (void)stop:(CDVInvokedUrlCommand*)command;
 - (void)startRecording:(CDVInvokedUrlCommand*)command;
+- (void)forceSpeaker:(CDVInvokedUrlCommand*)command;
 - (void)didReceiveAudioData:(short*)data dataLength:(int)length;
 - (void)didEncounterError:(NSString*)msg;
 - (void)didFinish:(NSString*)url;
@@ -98,6 +99,11 @@
     [self.audioReceiver start];
 }
 
+- (void)forceSpeaker:(CDVInvokedUrlCommand*)command {
+    [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayAndRecord withOptions:AVAudioSessionCategoryOptionDefaultToSpeaker error: nil];
+    CDVPluginResult* result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDouble:0.0f];
+    [self.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+}
 
 - (void)stop:(CDVInvokedUrlCommand*)command
 {

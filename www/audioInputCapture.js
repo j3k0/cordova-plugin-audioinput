@@ -242,6 +242,31 @@ audioinput.stop = function (onStopped) {
 };
 
 /**
+ * Force iOS device to play sound from the loud speaker.
+ */
+audioinput.forceSpeaker = function() {
+    if (iOS()) {
+        // if (audioinput._cfg.debug)
+            console.log('audioinput: forcing loud speaker on iOS...');
+        exec(audioinput._audioInputEvent, audioinput._audioInputErrorEvent, "AudioInputCapture", "forceSpeaker", []);
+    }
+
+    function iOS() {
+        if (window.device) return window.device === 'iOS';
+        return [
+            'iPad Simulator',
+            'iPhone Simulator',
+            'iPod Simulator',
+            'iPad',
+            'iPhone',
+            'iPod'
+        ].includes(navigator.platform) ||
+        // iPad on iOS 13 detection
+        (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+    }
+};
+
+/**
  * Connect the audio node
  *
  * @param audioNode
