@@ -156,6 +156,7 @@ void HandleInputBuffer(void* inUserData,
       }
 
       _recordState.mIsRunning = YES;
+      [[AVAudioSession sharedInstance] overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:nil];
 
       status = AudioQueueStart(_recordState.mQueue, NULL);
       [self hasError:status:__FILE__:__LINE__];
@@ -183,6 +184,7 @@ void HandleInputBuffer(void* inUserData,
 	AVAudioSession *audioSession = [AVAudioSession sharedInstance];
 	[audioSession setCategory:AVAudioSessionCategoryPlayAndRecord
 			    error:nil];
+	[audioSession overrideOutputAudioPort:AVAudioSessionPortOverrideSpeaker error:nil];
 
 	_audioRecorder = [[AVAudioRecorder alloc]
                               initWithURL:_fileUrl
