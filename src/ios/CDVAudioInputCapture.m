@@ -78,24 +78,22 @@
 
 - (void)startRecording:(CDVInvokedUrlCommand*)command
 {
-    int sampleRate = [[command.arguments objectAtIndex:0] intValue];
-    int bufferSizeInBytes = [[command.arguments objectAtIndex:1] intValue];
-    short channels = [[command.arguments objectAtIndex:2] intValue];
-    NSString* format = [command.arguments objectAtIndex:3];
-    int audioSourceType = [[command.arguments objectAtIndex:4] intValue];
-    _fileUrl = [command.arguments objectAtIndex:5];
-
-    if (self.audioReceiver != nil) {
-        [self.audioReceiver stop];
-        /* TODO [self.audioReceiver dealloc]; */
-	self.audioReceiver = nil;
-    }
-
-    self.audioReceiver = [[AudioReceiver alloc] init:sampleRate bufferSize:bufferSizeInBytes noOfChannels:channels audioFormat:format sourceType:audioSourceType fileUrl:_fileUrl];
-
-    self.audioReceiver.delegate = self;
-
-    [self.audioReceiver start];
+    [self.commandDelegate runInBackground:^{
+        int sampleRate = [[command.arguments objectAtIndex:0] intValue];
+        int bufferSizeInBytes = [[command.arguments objectAtIndex:1] intValue];
+        short channels = [[command.arguments objectAtIndex:2] intValue];
+        NSString* format = [command.arguments objectAtIndex:3];
+        int audioSourceType = [[command.arguments objectAtIndex:4] intValue];
+        self->_fileUrl = [command.arguments objectAtIndex:5];
+        if (self.audioReceiver != nil) {
+            [self.audioReceiver stop];
+            /* TODO [self.audioReceiver dealloc]; */
+            self.audioReceiver = nil;
+        }
+        self.audioReceiver = [[AudioReceiver alloc] init:sampleRate bufferSize:bufferSizeInBytes noOfChannels:channels audioFormat:format sourceType:audioSourceType fileUrl:self->_fileUrl];
+        self.audioReceiver.delegate = self;
+        [self.audioReceiver start];
+    }];
 }
 
 
