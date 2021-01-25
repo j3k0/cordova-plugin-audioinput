@@ -1,4 +1,7 @@
-# cordova-plugin-audioinput
+# cordova-plugin-fovea-audioinput
+
+This is a fork of cordova-plugin-audioinput, made necessary because the original author wouldn't merge the bug fixes into its repository.
+
 This Cordova plugin enables audio capture from the device microphone, by in (near) real-time forwarding raw audio data to the web layer of your web application.
 A typical usage scenario for this plugin would be to use the captured microphone audio as an audio source for [Web audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API) based applications.
 
@@ -17,12 +20,12 @@ The plugin supports two different methods for microphone capture:
 ## Installation
 From the Cordova Plugin Repository:
 ```
-cordova plugin add cordova-plugin-audioinput
+cordova plugin add cordova-plugin-fovea-audioinput
 ```
 
 or by using the GitHub project URL:
 ```
-cordova plugin add https://github.com/edimuj/cordova-plugin-audioinput.git
+cordova plugin add https://github.com/j3k0/cordova-plugin-audioinput.git
 ```
 
 I haven't tested the plugin with PhoneGap build and ionic build, so feel free to message me if you tried it with success there.
