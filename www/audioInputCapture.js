@@ -74,10 +74,21 @@ audioinput.DEFAULT = {
 /**
  * Does any initialization that might be required.
  *
- * @param cfg
+ * @param {Object} cfg
+ * keys:
+ *  sampleRate (44100),
+ *  bufferSize (16384),
+ *  channels (1 (mono) or 2 (stereo)),
+ *  format ('PCM_8BIT' or 'PCM_16BIT'),
+ *  normalize (true || false),
+ *  normalizationFactor (create float data by dividing the audio data with this factor; default: 32767.0)
+ *  streamToWebAudio (The plugin will handle all the conversion of raw data to audio)
+ *  audioContext (If no audioContext is given, one will be created)
+ *  concatenateMaxChunks (How many packets will be merged each time, low = low latency but can require more resources)
+ *  audioSourceType (Use audioinput.AUDIOSOURCE_TYPE)
  * @param onComplete
  */
-audioinput.initialize = function (cfg, onComplete) {
+audioinput.initialize = function (cfg, onComplete, onError) {
     if (!cfg) {
         cfg = {};
     }
@@ -111,7 +122,8 @@ audioinput.initialize = function (cfg, onComplete) {
         throw "Invalid concatenateMaxChunks (" + audioinput._cfg.concatenateMaxChunks + "). Must be greater than zero.";
     }
 
-    exec(onComplete, audioinput._audioInputErrorEvent, "AudioInputCapture", "initialize",
+    exec(filePath => onComplete(filePath), _audioInputErrorEvent(onError),
+         "AudioInputCapture", "initialize",
         [audioinput._cfg.sampleRate,
          audioinput._cfg.bufferSize,
          audioinput._cfg.channels,
@@ -120,108 +132,89 @@ audioinput.initialize = function (cfg, onComplete) {
          audioinput._cfg.fileUrl]);
 };
 
-
 /**
  * Checks (silently) whether the user has already given permission to access the microphone.
  *
  * @param onComplete
  */
-audioinput.checkMicrophonePermission = function (onComplete) {
-    exec(onComplete, audioinput._audioInputErrorEvent, "AudioInputCapture", "checkMicrophonePermission", []);
+audioinput.checkMicrophonePermission = function (onComplete, onError) {
+    exec(onComplete, _audioInputErrorEvent(onError),
+         "AudioInputCapture", "checkMicrophonePermission", []);
 };
-
 
 /**
  * Asks the user for permission to access the microphone.
  *
  * @param onComplete
  */
-audioinput.getMicrophonePermission = function (onComplete) {
-    exec(onComplete, audioinput._audioInputErrorEvent, "AudioInputCapture", "getMicrophonePermission", []);
+audioinput.getMicrophonePermission = function (onComplete, onError) {
+    exec(onComplete, _audioInputErrorEvent(onError),
+         "AudioInputCapture", "getMicrophonePermission", []);
 };
 
+audioinput.forceSpeaker = function (onComplete, onError) {
+  exec(onComplete, _audioInputErrorEvent(onError),
+       "AudioInputCapture", "forceSpeaker", []);
+}
+
+audioinput.deviceCurrentTime = function (onComplete, onError) {
+  exec(currentTime => callback(currentTime), _audioInputErrorEvent(onError),
+  "AudioInputCapture", "deviceCurrentTime", []);
+}
+
+audioinput.prepareToRecord = function (onComplete, onError) {
+  exec(onComplete, _audioInputErrorEvent(onError),
+       "AudioInputCapture", "prepareToRecord", []);
+}
+
+audioinput.record = function (onComplete, onError) {
+  if (audioinput._capturing) return;
+  audioinput._capturing = true;
+  exec(filePath => onComplete(filePath), _audioInputErrorEvent(onError),
+       "AudioInputCapture", "record", []);
+}
+
+audioinput.recordAtTime = function (time, onComplete, onError) {
+  if (audioinput._capturing) return;
+  audioinput._capturing = true;
+  exec(filePath => onComplete(filePath), _audioInputErrorEvent(onError), "AudioInputCapture", "recordAtTime", [time]);
+}
+
+audioinput.recordForDuration = function (duration, onComplete, onError) {
+  if (audioinput._capturing) return;
+  audioinput._capturing = true;
+  exec(filePath => onComplete(filePath), _audioInputErrorEvent(onError), "AudioInputCapture", "recordForDuration", [duration]);
+}
+
+audioinput.recordAtTimeForDuration = function (time, duration, onComplete, onError) {
+  if (audioinput._capturing) return;
+  audioinput._capturing = true;
+  exec(filePath => onComplete(filePath), _audioInputErrorEvent(onError), "AudioInputCapture", "recordAtTimeForDuration", [time, duration]);
+}
+
+audioinput.pause = function (onComplete, onError) {
+  if (!audioinput._capturing) return;
+  audioinput._capturing = false;
+  exec(onComplete, _audioInputErrorEvent(onError), "AudioInputCapture", "pause", []);
+}
+
+audioinput.stop = function (onComplete, onError) {
+  if (!audioinput._capturing) return;
+  audioinput._capturing = true;
+  exec(filePath => onComplete(filePath), _audioInputErrorEvent(onError), "AudioInputCapture", "stop", []);
+}
+
 /**
- * Start capture of Audio input
- *
- * @param {Object} cfg
- * keys:
- *  sampleRate (44100),
- *  bufferSize (16384),
- *  channels (1 (mono) or 2 (stereo)),
- *  format ('PCM_8BIT' or 'PCM_16BIT'),
- *  normalize (true || false),
- *  normalizationFactor (create float data by dividing the audio data with this factor; default: 32767.0)
- *  streamToWebAudio (The plugin will handle all the conversion of raw data to audio)
- *  audioContext (If no audioContext is given, one will be created)
- *  concatenateMaxChunks (How many packets will be merged each time, low = low latency but can require more resources)
- *  audioSourceType (Use audioinput.AUDIOSOURCE_TYPE)
+ * alias for audioinput.record
  */
-audioinput.start = function (cfg) {
-    if (!audioinput._capturing) {
-
-        if (!cfg) {
-            cfg = {};
-        }
-
-        if (!audioinput._cfg) audioinput._cfg = {};
-
-        audioinput._cfg.sampleRate = cfg.sampleRate || audioinput.DEFAULT.SAMPLERATE;
-        audioinput._cfg.bufferSize = cfg.bufferSize || audioinput.DEFAULT.BUFFER_SIZE;
-        audioinput._cfg.channels = cfg.channels || audioinput.DEFAULT.CHANNELS;
-        audioinput._cfg.format = cfg.format || audioinput.DEFAULT.FORMAT;
-        audioinput._cfg.normalize = typeof cfg.normalize === 'boolean' ? cfg.normalize : audioinput.DEFAULT.NORMALIZE;
-        audioinput._cfg.normalizationFactor = cfg.normalizationFactor || audioinput.DEFAULT.NORMALIZATION_FACTOR;
-        audioinput._cfg.streamToWebAudio = typeof cfg.streamToWebAudio === 'boolean' ? cfg.streamToWebAudio : audioinput.DEFAULT.STREAM_TO_WEBAUDIO;
-        audioinput._cfg.audioContext = cfg.audioContext || null;
-        audioinput._cfg.concatenateMaxChunks = cfg.concatenateMaxChunks || audioinput.DEFAULT.CONCATENATE_MAX_CHUNKS;
-        audioinput._cfg.audioSourceType = cfg.audioSourceType || 0;
-        audioinput._cfg.fileUrl = cfg.fileUrl || null;
-        audioinput._cfg.debug = cfg.debug || audioinput.DEFAULT.DEBUG;
-
-        if (audioinput._cfg.channels < 1 && audioinput._cfg.channels > 2) {
-            throw "Invalid number of channels (" + audioinput._cfg.channels + "). Only mono (1) and stereo (2) is" +
-            " supported.";
-        }
-        else if (audioinput._cfg.format !== "PCM_16BIT" && audioinput._cfg.format !== "PCM_8BIT") {
-            throw "Invalid format (" + audioinput._cfg.format + "). Only 'PCM_8BIT' and 'PCM_16BIT' is" +
-            " supported.";
-        }
-        else if (audioinput._cfg.bufferSize <= 0) {
-            throw "Invalid bufferSize (" + audioinput._cfg.bufferSize + "). Must be greater than zero.";
-        }
-        else if (audioinput._cfg.concatenateMaxChunks <= 0) {
-            throw "Invalid concatenateMaxChunks (" + audioinput._cfg.concatenateMaxChunks + "). Must be greater than zero.";
-        }
-
-        exec(audioinput._audioInputEvent, audioinput._audioInputErrorEvent, "AudioInputCapture", "start",
-            [audioinput._cfg.sampleRate,
-             audioinput._cfg.bufferSize,
-             audioinput._cfg.channels,
-             audioinput._cfg.format,
-             audioinput._cfg.audioSourceType,
-             audioinput._cfg.fileUrl]);
-
-        audioinput._capturing = true;
-
-        if (audioinput._cfg.streamToWebAudio) {
-            if (audioinput._initWebAudio(audioinput._cfg.audioContext)) {
-                audioinput._audioDataQueue = [];
-                audioinput._getNextToPlay();
-            }
-            else {
-                throw "The Web Audio API is not supported on this platform!";
-            }
-        }
-    }
-    else {
-        throw "Already capturing!";
-    }
+audioinput.start = function (onComplete, onError) {
+    audioinput.record(onComplete, onError);
 };
 
 
 /**
  * Stop capturing audio
- */
+ *
 audioinput.stop = function (onStopped) {
     if (audioinput._capturing) {
         exec(onStopped, audioinput._audioInputErrorEvent, "AudioInputCapture", "stop", []);
@@ -240,12 +233,13 @@ audioinput.stop = function (onStopped) {
         }
     }
 };
+*
 
-/**
+**
  * Connect the audio node
  *
  * @param audioNode
- */
+ *
 audioinput.connect = function (audioNode) {
     if (audioinput._micGainNode) {
         audioinput.disconnect();
@@ -253,23 +247,24 @@ audioinput.connect = function (audioNode) {
     }
 };
 
-/**
+**
  * Disconnect the audio node
- */
+ *
 audioinput.disconnect = function () {
     if (audioinput._micGainNode) {
         audioinput._micGainNode.disconnect();
     }
 };
 
-/**
+**
  * Returns the internally created Web Audio Context (if any exists)
  *
  * @returns {*}
- */
+ *
 audioinput.getAudioContext = function () {
     return audioinput._audioContext;
 };
+*/
 
 /**
  *
@@ -303,7 +298,7 @@ audioinput._webAudioAPISupported = false;
  * Callback for audio input
  *
  * @param {Object} audioInputData     keys: data (PCM)
- */
+ *
 audioinput._audioInputEvent = function (audioInputData) {
     try {
         if (audioInputData && audioInputData.data && audioInputData.data.length > 0) {
@@ -328,16 +323,22 @@ audioinput._audioInputEvent = function (audioInputData) {
         audioinput._audioInputErrorEvent("audioinput._audioInputEvent ex: " + ex);
     }
 };
+*/
 
 /**
- * Error callback for AudioInputCapture start
+ * Error callback factory
  * @param errorMessage
  * @private
  */
-audioinput._audioInputErrorEvent = function (errorMessage) {
-    cordova.fireWindowEvent("audioinputerror", {message: errorMessage});
-    if (audioinput._cfg.debug) {
-        console.error("audioinput._audioInputErrorEvent: " + errorMessage);
+function _audioInputErrorEvent (onError) {
+    return function (errorMessage) {
+        cordova.fireWindowEvent("audioinputerror", {message: errorMessage});
+        if (audioinput._cfg.debug) {
+            console.error("audioinput._audioInputErrorEvent: " + errorMessage);
+        }
+        if (onError) {
+            onError(errorMessage);
+        }
     }
 };
 
@@ -345,25 +346,27 @@ audioinput._audioInputErrorEvent = function (errorMessage) {
  * Finished callback for AudioInputCapture start
  * @param fileUrl
  * @private
- */
+ *
 audioinput._audioInputFinishedEvent = function (fileUrl) {
     cordova.fireWindowEvent("audioinputfinished", {file: fileUrl});
     if (audioinput._cfg.debug) {
         console.log("audioinput._audioInputFinishedEvent: " + fileUrl);
     }
 };
+*/
 
 /**
  * Finished callback for AudioInputCapture start
  * @param debugMessage
  * @private
- */
+ *
 audioinput._audioInputDebugEvent = function (debugMessage) {
     if (audioinput._cfg.debug) {
         cordova.fireWindowEvent("audioinputdebug", {message: debugMessage});
         console.log("audioinput._audioInputFinishedEvent: " + debugMessage);
     }
 };
+*/
 
 /**
  * Returns a typed array, normalizing if needed
@@ -415,14 +418,14 @@ function normalizeNoTyped (pcmData) {
  * @private
  * 
  * @returns {Int16Array|Float32Array|Array} 
- */
+ *
 audioinput._normalizeAudio = hasTypedArrays ? normalizeToTyped : normalizeNoTyped;
 
 
-/**
+**
  * Consumes data from the audioinput queue
  * @private
- */
+ *
 audioinput._getNextToPlay = function () {
     try {
         var duration = 100;
@@ -449,12 +452,12 @@ audioinput._getNextToPlay = function () {
 };
 
 
-/**
+**
  * Play audio using the Web Audio API
  * @param data
  * @returns {Number}
  * @private
- */
+ *
 audioinput._playAudio = function (data) {
     try {
         if (data && data.length > 0) {
@@ -492,10 +495,10 @@ audioinput._playAudio = function (data) {
 };
 
 
-/**
+**
  * Creates the Web Audio Context and audio nodes for output.
  * @private
- */
+ *
 audioinput._initWebAudio = function (audioCtxFromCfg) {
     try {
         if (audioCtxFromCfg) {
@@ -521,24 +524,25 @@ audioinput._initWebAudio = function (audioCtxFromCfg) {
     }
 };
 
-/**
+**
  * Puts audio data at the end of the queue
  *
  * @returns {*}
  * @private
- */
+ *
 audioinput._enqueueAudioData = function (data) {
     audioinput._audioDataQueue.push(data);
 };
 
-/**
+**
  * Gets and removes the oldest audio data from the queue
  *
  * @returns {*}
  * @private
- */
+ *
 audioinput._dequeueAudioData = function () {
     return audioinput._audioDataQueue.shift();
 };
+*/
 
 module.exports = audioinput;
