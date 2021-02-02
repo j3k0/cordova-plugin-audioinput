@@ -200,7 +200,7 @@ audioinput.pause = function (onComplete, onError) {
 
 audioinput.stop = function (onComplete, onError) {
   if (!audioinput._capturing) return;
-  audioinput._capturing = true;
+  audioinput._capturing = false;
   exec(filePath => onComplete(filePath), _audioInputErrorEvent(onError), "AudioInputCapture", "stop", []);
 }
 
