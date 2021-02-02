@@ -25,6 +25,7 @@
 - (void) recordAtTimeForDuration:(CDVInvokedUrlCommand*)command;
 - (void) pause:(CDVInvokedUrlCommand*)command;
 - (void) stop:(CDVInvokedUrlCommand*)command;
+- (void) deleteRecording:(CDVInvokedUrlCommand*)command;
 
 @end
 
@@ -236,6 +237,18 @@
     [self.commandDelegate runInBackground:^{
         [self.audioRecorder stop];
         [self sendFilePath:command.callbackId];
+    }];
+}
+
+- (void) deleteRecording:(CDVInvokedUrlCommand*)command
+{
+    if (self.audioRecorder == nil) {
+        [self sendError:@"audioRecorder is nil, make sure you call initialize()" callbackId:command.callbackId];
+        return;
+    }
+    [self.commandDelegate runInBackground:^{
+        [self.audioRecorder deleteRecording];
+        [self sendOK:command.callbackId];
     }];
 }
 

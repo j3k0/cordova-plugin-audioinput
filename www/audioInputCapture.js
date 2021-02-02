@@ -204,6 +204,11 @@ audioinput.stop = function (onComplete, onError) {
   exec(filePath => onComplete(filePath), _audioInputErrorEvent(onError), "AudioInputCapture", "stop", []);
 }
 
+audioinput.deleteRecording = function (onComplete, onError) {
+  if (audioinput._capturing) return; // can't delete while recording
+  exec(filePath => onComplete(filePath), _audioInputErrorEvent(onError), "AudioInputCapture", "deleteRecording", []);
+}
+
 /**
  * alias for audioinput.record
  */
