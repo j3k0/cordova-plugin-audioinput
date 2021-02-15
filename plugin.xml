@@ -18,7 +18,7 @@
         <clobbers target="audioinput"/>
     </js-module>
 
-    <!-- android -
+    <!-- android -->
     <platform name="android">
 
         <config-file parent="/*" target="res/xml/config.xml">
@@ -34,9 +34,13 @@
 
         <source-file src="src/android/AudioInputCapture.java" target-dir="src/com/exelerus/cordova/audioinputcapture"/>
         <source-file src="src/android/AudioInputReceiver.java" target-dir="src/com/exelerus/cordova/audioinputcapture"/>
+        <!--
+          idea: use jump3r to encode to MP3.
+          see: https://stackoverflow.com/questions/4997923/is-there-any-pure-java-way-to-convert-wav-to-mp3
+          source-file src="src/android/jump3r-1.0.3.jar" target-dir="libs"/>
+        -->
 
     </platform>
-    -->
 
     <!-- ios -->
     <platform name="ios">

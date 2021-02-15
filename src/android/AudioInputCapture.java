@@ -27,6 +27,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import java.lang.ref.WeakReference;
+import java.lang.System;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -42,7 +43,9 @@ public class AudioInputCapture extends CordovaPlugin
 {
     private static final String LOG_TAG = "AudioInputCapture";
 
-    private CallbackContext callbackContext = null;
+    private CallbackContext initializeCallbackContext = null;
+    private CallbackContext recordCallbackContext = null;
+    private CallbackContext stopCallbackContext = null;
     private CallbackContext getPermissionCallbackContext = null;
     private AudioInputReceiver receiver;
     private final AudioInputCaptureHandler handler = new AudioInputCaptureHandler(this);
@@ -63,13 +66,9 @@ public class AudioInputCapture extends CordovaPlugin
    
     @Override
     public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
-        if (action.equals("initialize")
-			// Allow "start" to be called without "initialize", to keep backward compatibility.
-			|| (action.equals("start") && !initialized)) {
-
-			this.callbackContext = callbackContext;
-
+        if (action.equals("initialize")) {
 			try {
+                Log.d(LOG_TAG, "initialize...");
 				this.sampleRate = args.getInt(0);
 				this.bufferSize = args.getInt(1);
 				this.channels = args.getInt(2);
@@ -81,6 +80,7 @@ public class AudioInputCapture extends CordovaPlugin
 				}
 				else {
 					String fileUrlString = args.getString(5);
+                    Log.d(LOG_TAG, "initialized with file: " + fileUrlString);
 					this.fileUrl = new URI(fileUrlString);
 					// Ensure it's a file URL
 					File file = new File(this.fileUrl);
@@ -90,38 +90,34 @@ public class AudioInputCapture extends CordovaPlugin
 				}
 			}
 			catch (URISyntaxException e) { // Not a valid URL
+                Log.e(LOG_TAG, e.getMessage(), e);
 				if (receiver != null) receiver.interrupt();
 				this.fileUrl = null;
-
-				this.callbackContext.sendPluginResult(
-				new PluginResult(PluginResult.Status.ERROR, INVALID_URL_ERROR));
+				callbackContext.sendPluginResult(
+                    new PluginResult(PluginResult.Status.ERROR, INVALID_URL_ERROR));
 
 				return false;
 			}
 			catch (IllegalArgumentException e) { // Not a file URL
+                Log.e(LOG_TAG, e.getMessage(), e);
 				if (receiver != null) receiver.interrupt();
-
-				this.callbackContext.sendPluginResult(
-				new PluginResult(PluginResult.Status.ERROR, INVALID_URL_ERROR));
-
+				callbackContext.sendPluginResult(
+                    new PluginResult(PluginResult.Status.ERROR, INVALID_URL_ERROR));
 				return false;
 			}
 			catch (Exception e) {
+                Log.e(LOG_TAG, e.getMessage(), e);
 				if (receiver != null) receiver.interrupt();
-
-				this.callbackContext.sendPluginResult(
-				new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
-
+				callbackContext.sendPluginResult(
+                    new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
 				return false;
 			}
 
-			if (action.equals("initialize")) {
-				// Invoke callback
-				PluginResult result = new PluginResult(PluginResult.Status.OK);
-				callbackContext.sendPluginResult(result);
-				return true;
-			}
-        } // Allow fall-through through to "start"...
+            // Invoke callback
+            PluginResult result = new PluginResult(PluginResult.Status.OK);
+            callbackContext.sendPluginResult(result);
+            return true;
+        }
 
 		if (action.equals("checkMicrophonePermission")) {
 			if(PermissionHelper.hasPermission(this, permissions[RECORD_AUDIO])) {
@@ -136,14 +132,14 @@ public class AudioInputCapture extends CordovaPlugin
 			return true;
 		}
 	
-		if (action.equals("getMicrophonePermission")) {
-			if(PermissionHelper.hasPermission(this, permissions[RECORD_AUDIO])) {
+		if (action.equals("getMicrophonePermission") || action.equals("prepareToRecord")) {
+			if (PermissionHelper.hasPermission(this, permissions[RECORD_AUDIO])) {
 				PluginResult result = new PluginResult(PluginResult.Status.OK, Boolean.TRUE);
 				callbackContext.sendPluginResult(result);
 			}
 			else {
 				// Save context for when we know whether they've given permission
-				getPermissionCallbackContext = callbackContext;
+				this.getPermissionCallbackContext = callbackContext;
 
 				// Return nothing in particular for now...
 				PluginResult pluginResult = new PluginResult(PluginResult.Status.NO_RESULT);
@@ -157,55 +153,9 @@ public class AudioInputCapture extends CordovaPlugin
 			return true;
 		}
 
-        if (action.equals("start")) {
-			try {
-				this.sampleRate = args.getInt(0);
-				this.bufferSize = args.getInt(1);
-				this.channels = args.getInt(2);
-				this.format = args.getString(3);
-				this.audioSource = args.getInt(4);
-
-				if (args.isNull(5))  {
-					this.fileUrl = null;
-				}
-				else {
-					String fileUrlString = args.getString(5);
-					this.fileUrl = new URI(fileUrlString);
-					// Ensure it's a file URL
-					File file = new File(this.fileUrl);
-					if (file.exists() == true) {
-						file.delete();
-					}
-				}
-
-				promptForRecord();
-			}
-			catch (URISyntaxException e) { // Not a valid URL
-				if (receiver != null) receiver.interrupt();
-				this.fileUrl = null;
-
-				this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR,
-				INVALID_URL_ERROR));
-
-				return false;
-			}
-			catch (IllegalArgumentException e) { // Not a file URL
-				if (receiver != null) receiver.interrupt();
-
-				this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR,
-				INVALID_URL_ERROR));
-
-				return false;
-			}
-			catch (Exception e) {
-				if (receiver != null) receiver.interrupt();
-
-				this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR,
-				PERMISSION_DENIED_ERROR));
-
-				return false;
-			}
-
+        if (action.equals("record")) {
+			this.recordCallbackContext = callbackContext;
+            promptForRecord();
 			// Don't return any result now, since status results will be sent when events come in from broadcast receiver
 			PluginResult pluginResult = new PluginResult(PluginResult.Status.NO_RESULT);
 			pluginResult.setKeepCallback(true);
@@ -216,26 +166,78 @@ public class AudioInputCapture extends CordovaPlugin
 		if (action.equals("stop")) {
 			if (receiver != null)
 			{
+                this.stopCallbackContext = callbackContext;
 				receiver.interrupt();
 
-				// Only do this if we're not saving to a file,
-				// Otherwise we won't get the event about the file being complete
-				if (fileUrl == null) {
-					this.sendUpdate(new JSONObject(), false); // Release status callback in JS side
-					this.callbackContext = null;
-				}
-				callbackContext.success();
+                Log.d(LOG_TAG, "waiting for receiver thread to stop...");
+                try {
+                    receiver.join();
+                    Log.d(LOG_TAG, "receiver thread stopped.");
+                }
+                catch (InterruptedException e) {
+                    Log.e(LOG_TAG, e.getMessage(), e);
+                }
+
+                PluginResult pluginResult = new PluginResult(PluginResult.Status.NO_RESULT);
+                pluginResult.setKeepCallback(true);
+                callbackContext.sendPluginResult(pluginResult);
 
 				return true;
 			}
 			else
-			{ // Not recording, so can't stop
-				this.callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR,
-				INVALID_STATE_ERROR));
-
+			{
+                // Not recording, so can't stop
+				callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.ERROR, INVALID_STATE_ERROR));
 				return false;
 			}
 		}
+
+        if (action.equals("forceSpeaker")) {
+            // not needed on android
+            PluginResult result = new PluginResult(PluginResult.Status.OK, Boolean.TRUE);
+            callbackContext.sendPluginResult(result);
+            return true;
+        }
+
+        if (action.equals("deviceCurrentTime")) {
+            PluginResult result = new PluginResult(PluginResult.Status.OK, System.currentTimeMillis());
+            callbackContext.sendPluginResult(result);
+            return true;
+        }
+
+        if (action.equals("recordAtTime")) {
+            PluginResult result = new PluginResult(PluginResult.Status.OK, Boolean.TRUE);
+            callbackContext.sendPluginResult(result);
+            return true;
+        }
+
+        if (action.equals("recordForDuration")) {
+            PluginResult result = new PluginResult(PluginResult.Status.OK, Boolean.TRUE);
+            callbackContext.sendPluginResult(result);
+            return true;
+        }
+
+        if (action.equals("recordAtTimeForDuration")) {
+            PluginResult result = new PluginResult(PluginResult.Status.OK, Boolean.TRUE);
+            callbackContext.sendPluginResult(result);
+            return true;
+        }
+
+        if (action.equals("pause")) {
+            PluginResult result = new PluginResult(PluginResult.Status.OK, Boolean.TRUE);
+            callbackContext.sendPluginResult(result);
+            return true;
+        }
+
+        if (action.equals("deleteRecording")) {
+            File file = new File(this.fileUrl);
+            if (file.exists() == true) {
+                file.delete();
+            }
+            PluginResult result = new PluginResult(PluginResult.Status.OK, Boolean.TRUE);
+            callbackContext.sendPluginResult(result);
+            return true;
+        }
 
         return false;
     }
@@ -256,10 +258,21 @@ public class AudioInputCapture extends CordovaPlugin
      * Create a new plugin result and send it back to JavaScript
      */
     private void sendUpdate(JSONObject info, boolean keepCallback) {
-        if (this.callbackContext != null) {
+        if (this.recordCallbackContext != null) {
             PluginResult result = new PluginResult(PluginResult.Status.OK, info);
             result.setKeepCallback(keepCallback);
-            this.callbackContext.sendPluginResult(result);
+            this.recordCallbackContext.sendPluginResult(result);
+            if (keepCallback == false) {
+                this.recordCallbackContext = null;
+            }
+        }
+        if (this.stopCallbackContext != null) {
+            PluginResult result = new PluginResult(PluginResult.Status.OK, this.fileUrl != null ? fileUrl.toString() : "");
+            result.setKeepCallback(keepCallback);
+            this.stopCallbackContext.sendPluginResult(result);
+            if (keepCallback == false) {
+                this.stopCallbackContext = null;
+            }
         }
     }
 
@@ -272,8 +285,10 @@ public class AudioInputCapture extends CordovaPlugin
 
         @Override
         public void handleMessage(Message msg) {
+            Log.d(LOG_TAG, "message received from the recorder...");
             AudioInputCapture activity = mActivity.get();
             if (activity != null) {
+                // Log.d(LOG_TAG, "activity: " + (activity.fileUrl != null ? activity.fileUrl.toString() : "null") + " > " + msg.getData().getString("file"));
                 JSONObject info = new JSONObject();
 
                 try {
@@ -294,14 +309,15 @@ public class AudioInputCapture extends CordovaPlugin
 				   try {
 				      info.put("file", msg.getData().getString("file"));
 				      activity.sendUpdate(info, false); // Release status callback in JS side
-				      activity.callbackContext = null;
+				      // activity.recordCallbackContext = null;
 				   }
 				   catch (JSONException e) {
 				      Log.e(LOG_TAG, e.getMessage(), e);
 				   }
 				}
 				else {
-				   activity.sendUpdate(info, true);
+				   activity.sendUpdate(info, false);
+                   // activity.recordCallbackContext = null;
 				}
             }
         }
@@ -321,10 +337,13 @@ public class AudioInputCapture extends CordovaPlugin
 		// If we've already got a receiver, stop it
 		if (receiver != null) receiver.interrupt();
 
-		if(PermissionHelper.hasPermission(this, permissions[RECORD_AUDIO])) {
+		if (PermissionHelper.hasPermission(this, permissions[RECORD_AUDIO])) {
 			receiver = new AudioInputReceiver(this.sampleRate, this.bufferSize, this.channels, this.format, this.audioSource, this.fileUrl);
 			receiver.setHandler(handler);
 			receiver.start();
+            PluginResult result = new PluginResult(PluginResult.Status.OK, this.fileUrl != null ? fileUrl.toString() : "");
+            this.recordCallbackContext.sendPluginResult(result);
+            this.recordCallbackContext = null;
 		}
 		else {
 			getMicPermission(RECORD_AUDIO);
@@ -337,29 +356,31 @@ public class AudioInputCapture extends CordovaPlugin
     public void onRequestPermissionResult(int requestCode, String[] permissions,
                                               int[] grantResults) throws JSONException {
        
-        for(int r:grantResults) {
-			if(r == PackageManager.PERMISSION_DENIED) {
-				if (this.getPermissionCallbackContext == null) {
-					// Called directly from "start"
-					this.callbackContext.sendPluginResult(
-					new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
-
+        for (int r:grantResults) {
+			if (r == PackageManager.PERMISSION_DENIED) {
+				if (this.recordCallbackContext != null) {
+					// Called directly from "record"
+					this.recordCallbackContext.sendPluginResult(
+                        new PluginResult(PluginResult.Status.ERROR, PERMISSION_DENIED_ERROR));
+                    this.recordCallbackContext = null;
 					return;
 				}
-				else { // Called from "getMicrophonePermission"
+				else if (this.getPermissionCallbackContext != null) { // Called from "getMicrophonePermission"
 					PluginResult result = new PluginResult(PluginResult.Status.OK, Boolean.FALSE);
 					this.getPermissionCallbackContext.sendPluginResult(result);
+                    this.getPermissionCallbackContext = null;
 				}
 			}
         }
 
-		if (this.getPermissionCallbackContext == null) {
-			// Called directly from "start"
+		if (this.recordCallbackContext != null) {
+			// Called directly from "record"
 		    promptForRecord();
 		}
-		else { // Called from "getMicrophonePermission"
+		else if (this.getPermissionCallbackContext != null) { // Called from "getMicrophonePermission"
 			PluginResult result = new PluginResult(PluginResult.Status.OK, Boolean.TRUE);
 			this.getPermissionCallbackContext.sendPluginResult(result);
+            this.getPermissionCallbackContext = null;
 		}
     }
 }

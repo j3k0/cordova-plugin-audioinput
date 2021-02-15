@@ -192,6 +192,7 @@ public class AudioInputReceiver extends Thread {
 					}
 
 					os.close();
+                    // convert .pcm to .wav
 					File wav = new File(finalUrl);
 					addWavHeader(audioFile, wav);
 					audioFile.delete();
@@ -274,7 +275,6 @@ public class AudioInputReceiver extends Thread {
 			e.printStackTrace();
 		}
 
-		fPCM.delete();
 		return wav;
 	}
 

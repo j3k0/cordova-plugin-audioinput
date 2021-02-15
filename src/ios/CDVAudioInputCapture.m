@@ -26,6 +26,8 @@
 - (void) pause:(CDVInvokedUrlCommand*)command;
 - (void) stop:(CDVInvokedUrlCommand*)command;
 - (void) deleteRecording:(CDVInvokedUrlCommand*)command;
+- (void) checkMicrophonePermission:(CDVInvokedUrlCommand*)command;
+- (void) getMicrophonePermission:(CDVInvokedUrlCommand*)command;
 
 @end
 
